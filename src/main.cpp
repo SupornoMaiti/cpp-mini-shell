@@ -35,6 +35,24 @@ int main()
             }
             // pushing the null pointer.
             c_pointers.push_back(nullptr);
+
+            // Solving the "cd" problem
+            if (tokens[0] == "cd")
+            {
+                if (tokens.size() < 2)
+                {
+                    perror("Error: Provide a valid path");
+                }
+                else
+                {
+                    if (chdir(tokens[1].data()) != 0)
+                    {
+                        perror("Error: cd failed");
+                    }
+                }
+                continue; // path successfully changed, Don't need to run the loop anymore.
+            }
+
             // creating parent and child process
             pid_t pid = fork(); // making the parent and child process
             if (pid < 0)
@@ -54,7 +72,7 @@ int main()
                 // waiting for the child process to be dead.
                 wait(NULL);
             }
-            cout << endl;
+            // cout << endl;
         }
     }
     return 0;
