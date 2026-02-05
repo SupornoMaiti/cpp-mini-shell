@@ -1,3 +1,5 @@
 #compiled binaries
 *.out
 main
+#vs code configs
+.vscode
