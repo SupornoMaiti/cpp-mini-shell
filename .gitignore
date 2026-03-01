@@ -1,5 +1,18 @@
-#compiled binaries
+# CLion / JetBrains IDE files
+.idea/
+cmake-build-*/
+
+# VS Code files
+.vscode/
+
+# Compiled executables and object files
+*.o
 *.out
-main
-#vs code configs
-.vscode
+*.exe
+*.a
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
