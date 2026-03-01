@@ -1,5 +1,18 @@
-#compiled binaries
+# CLion / JetBrains IDE files
+.idea/
+cmake-build-*/
+
+# VS Code files (Ignore this if you only want to track raw code, not editor settings)
+.vscode/
+
+# Compiled executables and object files
+*.o
 *.out
-main
-#vs code configs
-.vscode
+*.exe
+*.a
+
+# CMake generated files (just in case you ever accidentally build in the root folder)
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
