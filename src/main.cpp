@@ -2,78 +2,157 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
 using namespace std;
 
-int main()
+class Shell
 {
-    string ip;
-    vector<string> tokens;
-
-    while (true)
+private:
+    vector<string> tokenize(const string &ip)
     {
-        cout << "user@myShell> ";
-        getline(cin, ip);
-        if (ip == "exit")
-            break;
-        else
+        vector<string> tokens;
+        stringstream ss(ip);
+        string token;
+        while (ss >> token)
         {
-            stringstream ss(ip);
-            string token;
-            tokens.clear();
-            while (ss >> token)
-            {
-                tokens.push_back(token);
-            }
-            // converting the tokens vector int a list of pointers storing the same token/s.
-            vector<char *> c_pointers;
-            for (auto &it : tokens)
-            {
-                c_pointers.push_back(it.data());
-            }
-            // pushing the null pointer.
-            c_pointers.push_back(nullptr);
+            tokens.push_back(token);
+        }
+        return tokens;
+    }
 
-            // Solving the "cd" problem
-            if (tokens[0] == "cd")
+    vector<char *> tokens_to_c_pointers(vector<string> &tokens)
+    {
+        vector<char *> c_pointers;
+        for (auto &token : tokens)
+        {
+            c_pointers.push_back(const_cast<char *>(token.c_str()));
+        }
+        c_pointers.push_back(nullptr);
+        return c_pointers;
+    }
+
+    bool handle_cd(vector<string> &tokens)
+    {
+        if (!tokens.empty() && tokens[0] == "cd")
+        {
+            if (tokens.size() < 2)
             {
-                if (tokens.size() < 2)
+                perror("Error: Provide a valid path");
+            }
+            else if (chdir(tokens[1].c_str()) != 0)
+            {
+                perror("Error: cd failed");
+            }
+            return true;
+        }
+        return false;
+    }
+
+    string redirection(vector<string> &tokens)
+    {
+        for (int i = 0; i < static_cast<int>(tokens.size()); i++)
+        {
+            if (tokens[i] == ">")
+            {
+                if (i + 1 < static_cast<int>(tokens.size()) && (tokens.size() - (i + 1)) == 1)
                 {
-                    perror("Error: Provide a valid path");
+                    string redirected_file_name = tokens[i + 1];
+                    tokens.resize(i);
+                    return redirected_file_name;
                 }
-                else
+
+                cout << "Error: Invalid Redirection Syntax" << endl;
+                tokens.clear();
+                return "";
+            }
+        }
+        return "";
+    }
+
+    void execute_command(vector<string> &tokens)
+    {
+        string redirected_file_name = redirection(tokens);
+        if (tokens.empty())
+        {
+            return;
+        }
+
+        vector<char *> c_args = tokens_to_c_pointers(tokens);
+
+        pid_t pid = fork();
+        if (pid < 0)
+        {
+            cout << "Error: Cannot Execute Command." << endl;
+            return;
+        }
+
+        if (pid == 0)
+        {
+            if (!redirected_file_name.empty())
+            {
+                int fd = open(redirected_file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd < 0)
                 {
-                    if (chdir(tokens[1].data()) != 0)
-                    {
-                        perror("Error: cd failed");
-                    }
+                    perror("Error: Cannot open redirection file");
+                    exit(1);
                 }
-                continue; // path successfully changed, Don't need to run the loop anymore.
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
             }
 
-            // creating parent and child process
-            pid_t pid = fork(); // making the parent and child process
-            if (pid < 0)
+            execvp(c_args[0], c_args.data());
+            perror("Error: Command not found");
+            exit(1);
+        }
+
+        wait(nullptr);
+    }
+
+public:
+    void run()
+    {
+        string ip;
+
+        while (true)
+        {
+            cout << "user@myShell> ";
+            if (!getline(cin, ip))
             {
-                cout << "Error: Process not created.";
+                break;
             }
-            else if (pid == 0)
+
+            if (ip.empty())
             {
-                // This is child process
-                execvp(c_pointers[0], c_pointers.data());
-                // if the execvp fails....
-                perror("Error: Command not found");
-                exit(1);
+                continue;
             }
-            else
+
+            vector<string> tokens = tokenize(ip);
+            if (tokens.empty())
             {
-                // waiting for the child process to be dead.
-                wait(NULL);
+                continue;
             }
-            // cout << endl;
+
+            if (tokens[0] == "exit")
+            {
+                break;
+            }
+
+            if (handle_cd(tokens))
+            {
+                continue;
+            }
+
+            execute_command(tokens);
         }
     }
+};
+
+int main()
+{
+    Shell myShell;
+    myShell.run();
     return 0;
 }

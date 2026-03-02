@@ -1,5 +1,15 @@
-#compiled binaries
+# compiled binaries
 *.out
 main
-#vs code configs
-.vscode
+
+# IDE/editor configs
+.vscode/
+.idea/
+
+# CMake generated files
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+compile_commands.json
