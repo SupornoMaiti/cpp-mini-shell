@@ -7,7 +7,7 @@ A minimal Linux shell written in C++ to learn Operating Systems internals.
 ## ⚡ Quick Start
 
 ```bash
-g++ main.cpp -o shell
+g++ src/main.cpp -o shell
 ./shell
 
 ```
