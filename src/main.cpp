@@ -11,7 +11,7 @@ using namespace std;
 class Shell
 {
 private:
-    vector<string> tokenize(const string &ip)
+    static vector<string> tokenize(const string &ip)
     {
         vector<string> tokens;
         stringstream ss(ip);
@@ -23,7 +23,7 @@ private:
         return tokens;
     }
 
-    vector<char *> tokens_to_c_pointers(vector<string> &tokens)
+    static vector<char *> tokens_to_c_pointers(const vector<string> &tokens)
     {
         vector<char *> c_pointers;
         for (auto &token : tokens)
@@ -34,13 +34,13 @@ private:
         return c_pointers;
     }
 
-    bool handle_cd(vector<string> &tokens)
+    static bool handle_cd(const vector<string> &tokens)
     {
         if (!tokens.empty() && tokens[0] == "cd")
         {
             if (tokens.size() < 2)
             {
-                perror("Error: Provide a valid path");
+                cout <<"Error: Provide a valid path" << endl;
             }
             else if (chdir(tokens[1].c_str()) != 0)
             {
@@ -51,13 +51,13 @@ private:
         return false;
     }
 
-    string redirection(vector<string> &tokens)
+    static string redirection(vector<string> &tokens)
     {
-        for (int i = 0; i < static_cast<int>(tokens.size()); i++)
+        for (size_t i = 0; i < tokens.size(); i++)
         {
             if (tokens[i] == ">")
             {
-                if (i + 1 < static_cast<int>(tokens.size()) && (tokens.size() - (i + 1)) == 1)
+                if (i + 1 < (tokens.size()) && (tokens.size() - (i + 1)) == 1)
                 {
                     string redirected_file_name = tokens[i + 1];
                     tokens.resize(i);
@@ -72,7 +72,7 @@ private:
         return "";
     }
 
-    void execute_command(vector<string> &tokens)
+    static void execute_command(vector<string> &tokens)
     {
         string redirected_file_name = redirection(tokens);
         if (tokens.empty())
@@ -80,9 +80,9 @@ private:
             return;
         }
 
-        vector<char *> c_args = tokens_to_c_pointers(tokens);
+        const vector<char *> c_args = tokens_to_c_pointers(tokens);
 
-        pid_t pid = fork();
+        const pid_t pid = fork();
         if (pid < 0)
         {
             cout << "Error: Cannot Execute Command." << endl;
@@ -111,6 +111,30 @@ private:
         wait(nullptr);
     }
 
+    static string get_prompt()
+    {
+        // get username.
+        string uname = "user";
+        if (const char *user = getenv("USER"); user != nullptr)
+            uname = user;
+
+        // get hostname
+        char host_buffer[256];
+        string host_name = "localhost";
+        if (gethostname(host_buffer,sizeof(host_buffer)) == 0) {
+            host_name = host_buffer;
+        }
+
+        //get current working directory
+        char cwd_buffer[1024];
+        string cwd;
+        if (getcwd(cwd_buffer,sizeof(cwd_buffer)) != nullptr) {
+            cwd = cwd_buffer;
+        }
+
+        return "\033[1;32m" + uname + "@" + host_name + "\033[0m:\033[1;34m" + cwd + "\033[0m$ ";
+    }
+
 public:
     void run()
     {
@@ -118,7 +142,7 @@ public:
 
         while (true)
         {
-            cout << "user@myShell> ";
+            cout << get_prompt();
             if (!getline(cin, ip))
             {
                 break;
