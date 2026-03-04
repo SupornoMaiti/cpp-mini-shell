@@ -102,6 +102,7 @@ cpp-mini-shell/
 ├── src/
 │   └── main.cpp       # Core shell logic
 ├── CMakeLists.txt     # CMake build config
+├── LICENSE
 ├── .gitignore
 └── README.md
 ```
