@@ -8,6 +8,13 @@
 
 using namespace std;
 
+struct redirection_data
+{
+    string input_file = "";
+    string output_file = "";
+    bool append = false;
+};
+
 class Shell
 {
 private:
@@ -40,7 +47,7 @@ private:
         {
             if (tokens.size() < 2)
             {
-                cout <<"Error: Provide a valid path" << endl;
+                cout << "Error: Provide a valid path" << endl;
             }
             else if (chdir(tokens[1].c_str()) != 0)
             {
@@ -51,30 +58,66 @@ private:
         return false;
     }
 
-    static string redirection(vector<string> &tokens)
+    static redirection_data redirection(vector<string> &tokens)
     {
+        redirection_data data;
+        vector<string> clean_tokens;
         for (size_t i = 0; i < tokens.size(); i++)
         {
-            if (tokens[i] == ">")
+            if (tokens[i] == "<")
             {
-                if (i + 1 < (tokens.size()) && (tokens.size() - (i + 1)) == 1)
+                if (i + 1 < tokens.size())
                 {
-                    string redirected_file_name = tokens[i + 1];
-                    tokens.resize(i);
-                    return redirected_file_name;
+                    data.input_file = tokens[i + 1];
+                    i++;
                 }
-
-                cout << "Error: Invalid Redirection Syntax" << endl;
-                tokens.clear();
-                return "";
+                else
+                {
+                    cout << "Error: Invalid redirection syntax" << endl;
+                    tokens.clear();
+                    return data;
+                }
             }
+            else if (tokens[i] == ">")
+            {
+                if (i + 1 < tokens.size())
+                {
+                    data.output_file = tokens[i + 1];
+                    i++;
+                }
+                else
+                {
+                    cout << "Error: Invalid redirection syntax" << endl;
+                    tokens.clear();
+                    return data;
+                }
+            }
+            else if (tokens[i] == ">>")
+            {
+                if (i + 1 < tokens.size())
+                {
+                    data.append = true;
+                    data.output_file = tokens[i + 1];
+                    i++;
+                }
+                else
+                {
+                    cout << "Error: Invalid redirection syntax" << endl;
+                    tokens.clear();
+                    return data;
+                }
+            }
+            else
+                clean_tokens.emplace_back(tokens[i]);
         }
-        return "";
+        tokens = clean_tokens;
+        return data;
     }
 
     static void execute_command(vector<string> &tokens)
     {
-        string redirected_file_name = redirection(tokens);
+        redirection_data data;
+        data = redirection(tokens);
         if (tokens.empty())
         {
             return;
@@ -91,15 +134,28 @@ private:
 
         if (pid == 0)
         {
-            if (!redirected_file_name.empty())
+            if (!data.output_file.empty())
             {
-                int fd = open(redirected_file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                // handled both o/p redirection and append
+                int flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
+                int fd = open(data.output_file.c_str(), flags, 0644);
                 if (fd < 0)
                 {
                     perror("Error: Cannot open redirection file");
                     exit(1);
                 }
                 dup2(fd, STDOUT_FILENO);
+                close(fd);
+            }
+            if (!data.input_file.empty())
+            {
+                int fd = open(data.input_file.c_str(), O_RDONLY);
+                if (fd < 0)
+                {
+                    perror("Error: Cannot open redirection file");
+                    exit(1);
+                }
+                dup2(fd, STDIN_FILENO);
                 close(fd);
             }
 
@@ -121,14 +177,16 @@ private:
         // get hostname
         char host_buffer[256];
         string host_name = "localhost";
-        if (gethostname(host_buffer,sizeof(host_buffer)) == 0) {
+        if (gethostname(host_buffer, sizeof(host_buffer)) == 0)
+        {
             host_name = host_buffer;
         }
 
-        //get current working directory
+        // get current working directory
         char cwd_buffer[1024];
         string cwd;
-        if (getcwd(cwd_buffer,sizeof(cwd_buffer)) != nullptr) {
+        if (getcwd(cwd_buffer, sizeof(cwd_buffer)) != nullptr)
+        {
             cwd = cwd_buffer;
         }
 
