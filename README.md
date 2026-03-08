@@ -13,7 +13,7 @@ A minimal Unix-like shell built from scratch in **C++** to deeply understand Ope
 - ✅ **Colored Prompt** — displays `user@hostname:cwd$` with ANSI colors
 - ✅ **Built-in Commands** — `cd`, `exit`
 - ✅ **Process Management** — safe child process creation via `fork` + `wait`
-- 🔧 **Piping** *(in progress)* — chaining commands with `|`
+- 🔧 **Piping** _(in progress)_ — chaining commands with `|`
 
 ---
 
@@ -81,17 +81,17 @@ fork()  ──►  Creates child process
 
 ## 📚 Core OS Concepts Applied
 
-| Concept | System Call Used |
-|---|---|
-| Process Creation | `fork()` |
-| Program Execution | `execvp()` |
-| Process Synchronization | `wait()` |
-| Output Redirection | `dup2()`, `open()`, `close()` |
-| Directory Navigation | `chdir()` |
-| Environment Access | `getenv()` |
-| Hostname Resolution | `gethostname()` |
-| Working Directory | `getcwd()` |
-| Piping *(WIP)* | `pipe()` |
+| Concept                 | System Call Used              |
+| ----------------------- | ----------------------------- |
+| Process Creation        | `fork()`                      |
+| Program Execution       | `execvp()`                    |
+| Process Synchronization | `wait()`                      |
+| Output Redirection      | `dup2()`, `open()`, `close()` |
+| Directory Navigation    | `chdir()`                     |
+| Environment Access      | `getenv()`                    |
+| Hostname Resolution     | `gethostname()`               |
+| Working Directory       | `getcwd()`                    |
+| Piping _(WIP)_          | `pipe()`                      |
 
 ---
 
@@ -115,8 +115,8 @@ cpp-mini-shell/
 - [x] Output redirection (`>`)
 - [x] Colored prompt with user, host, cwd
 - [x] Built-in `cd` and `exit`
-- [ ] Input redirection (`<`) and append (`>>`)
-- [ ] Piping (`|`) — *in progress*
+- [x] Input redirection (`<`) and append (`>>`)
+- [ ] Piping (`|`) — _in progress_
 - [ ] Background processes (`&`)
 - [ ] Signal handling (`Ctrl+C`, `Ctrl+Z`)
 - [ ] Command history
