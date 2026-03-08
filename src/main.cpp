@@ -8,25 +8,55 @@
 
 using namespace std;
 
-struct redirection_data
-{
-    string input_file = "";
-    string output_file = "";
-    bool append = false;
-};
-
 class Shell
 {
 private:
+    struct RedirectionData
+    {
+        string input_file;
+        string output_file;
+        bool append = false;
+    };
+
     static vector<string> tokenize(const string &ip)
     {
         vector<string> tokens;
-        stringstream ss(ip);
-        string token;
-        while (ss >> token)
+        string current_token;
+        bool in_quotes = false;
+        for (const char &c : ip)
         {
-            tokens.push_back(token);
+            if (c == '"')
+            {
+                in_quotes = !in_quotes;
+                continue;
+            }
+            else if (c == ' ')
+            {
+                if (in_quotes) // space in between quotes
+                {
+                    current_token.push_back(c);
+                }
+                // a single token is complete
+                else
+                {
+                    if (!current_token.empty())
+                    {
+                        tokens.push_back(current_token);
+                        current_token = "";
+                    }
+                }
+            }
+            else
+                current_token.push_back(c);
         }
+        if (in_quotes)
+        {
+            cout << "Error: Unclosed quotes." << endl;
+            tokens.clear();
+            return tokens;
+        }
+        if (!current_token.empty())
+            tokens.push_back(current_token);
         return tokens;
     }
 
@@ -49,6 +79,10 @@ private:
             {
                 cout << "Error: Provide a valid path" << endl;
             }
+            else if (tokens.size() > 2)
+            {
+                cout << "Error: cd takes only one argument" << endl;
+            }
             else if (chdir(tokens[1].c_str()) != 0)
             {
                 perror("Error: cd failed");
@@ -58,9 +92,9 @@ private:
         return false;
     }
 
-    static redirection_data redirection(vector<string> &tokens)
+    static RedirectionData redirection(vector<string> &tokens)
     {
-        redirection_data data;
+        RedirectionData data;
         vector<string> clean_tokens;
         for (size_t i = 0; i < tokens.size(); i++)
         {
@@ -75,7 +109,7 @@ private:
                 {
                     cout << "Error: Invalid redirection syntax" << endl;
                     tokens.clear();
-                    return data;
+                    return RedirectionData{};
                 }
             }
             else if (tokens[i] == ">")
@@ -89,7 +123,7 @@ private:
                 {
                     cout << "Error: Invalid redirection syntax" << endl;
                     tokens.clear();
-                    return data;
+                    return RedirectionData{};
                 }
             }
             else if (tokens[i] == ">>")
@@ -104,7 +138,7 @@ private:
                 {
                     cout << "Error: Invalid redirection syntax" << endl;
                     tokens.clear();
-                    return data;
+                    return RedirectionData{};
                 }
             }
             else
@@ -116,8 +150,7 @@ private:
 
     static void execute_command(vector<string> &tokens)
     {
-        redirection_data data;
-        data = redirection(tokens);
+        RedirectionData data = redirection(tokens);
         if (tokens.empty())
         {
             return;
@@ -144,7 +177,11 @@ private:
                     perror("Error: Cannot open redirection file");
                     exit(1);
                 }
-                dup2(fd, STDOUT_FILENO);
+                if (dup2(fd, STDOUT_FILENO) < 0)
+                {
+                    perror("Error: dup2 failed");
+                    exit(1);
+                }
                 close(fd);
             }
             if (!data.input_file.empty())
@@ -155,7 +192,11 @@ private:
                     perror("Error: Cannot open redirection file");
                     exit(1);
                 }
-                dup2(fd, STDIN_FILENO);
+                if (dup2(fd, STDIN_FILENO) < 0)
+                {
+                    perror("Error: dup2 failed");
+                    exit(1);
+                }
                 close(fd);
             }
 
@@ -164,7 +205,8 @@ private:
             exit(1);
         }
 
-        wait(nullptr);
+        int process_status;
+        waitpid(pid, &process_status, 0);
     }
 
     static string get_prompt()
@@ -200,7 +242,7 @@ public:
 
         while (true)
         {
-            cout << get_prompt();
+            cout << get_prompt() << flush;
             if (!getline(cin, ip))
             {
                 break;
