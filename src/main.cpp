@@ -1,3 +1,4 @@
+#include <array>
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -58,6 +59,40 @@ private:
         if (!current_token.empty())
             tokens.push_back(current_token);
         return tokens;
+    }
+
+    vector<vector<string>> split_by_pipe(const vector<string> &tokens)
+    {
+        vector<vector<string>> splitted_tokens;
+        vector<string> current_tokens;
+        for (const string &s : tokens)
+        {
+            if (s == "|")
+            {
+                if (current_tokens.empty())
+                {
+                    cout << "Error: Invalid Syntax." << endl;
+                    return {};
+                }
+                splitted_tokens.push_back(current_tokens);
+                current_tokens.clear();
+                continue;
+            }
+            else
+            {
+                current_tokens.push_back(s);
+            }
+        }
+        if (current_tokens.empty())
+        {
+            cout << "Error: Invalid Syntax." << endl;
+            return {};
+        }
+        else
+        {
+            splitted_tokens.push_back(current_tokens);
+        }
+        return splitted_tokens;
     }
 
     static vector<char *> tokens_to_c_pointers(const vector<string> &tokens)
@@ -205,8 +240,61 @@ private:
             exit(1);
         }
 
-        int process_status;
+        int process_status; //Process Status stored for later use.
         waitpid(pid, &process_status, 0);
+    }
+
+    void execute_pipeline(const vector<vector<string>> &commands)
+    {
+        size_t n = commands.size();
+        if (n == 0) return;
+        vector<array<int, 2>> fd(n-1);
+        vector<pid_t> pids(n);
+        //creating n-1 pipes upfront
+        for (size_t i = 0; i < n-1; ++i) {
+            if (pipe(fd[i].data()) < 0) {
+                perror("Error: Pipe creation failed.");
+            }
+        }
+        //forking n processes
+        for (size_t i = 0; i < n; ++i) {
+            pids[i] = fork();
+            if (pids[i] == 0) {
+                //i th child
+                if (i > 0) {
+                    // If it is not first process.
+                    dup2(fd[i - 1][0],STDIN_FILENO);
+                }
+                if (i < n - 1) {
+                    // If it is not last process
+                    dup2(fd[i][1],STDOUT_FILENO);
+                }
+                //As child inherits all the pipes from the parent need to close all.
+                for (auto &j: fd) {
+                    close(j[0]); //Close all read ends.
+                    close(j[1]); //close all write ends.
+                }
+                //Execute this child's command
+                vector<string> cmd = commands[i]; //copying as the function below takes it by reference
+                RedirectionData data;
+                data = redirection(cmd);
+                if (cmd.empty()) exit(1);
+                //Executing the command
+                vector<char*> c_args = tokens_to_c_pointers(cmd);
+                execvp(c_args[0],c_args.data());
+                perror("Error: Command not found");
+                exit(1);
+            }
+        }
+        //closing all pipes in parent process
+        for (auto & i : fd) {
+            close(i[0]);
+            close(i[1]);
+        }
+        //waiting for all child processes;
+        for (auto& i : pids) {
+            waitpid(i,nullptr,0);
+        }
     }
 
     static string get_prompt()
@@ -268,8 +356,19 @@ public:
             {
                 continue;
             }
-
-            execute_command(tokens);
+            //Splitting for checkin pipes
+            vector<vector<string>> commands = split_by_pipe(tokens);
+            if (commands.empty()) {
+                continue;
+            }
+            //No pipes found
+            if (commands.size() == 1) {
+                execute_command(commands[0]);
+            }
+            //pipes found
+            else {
+                execute_pipeline(commands);
+            }
         }
     }
 };
