@@ -116,10 +116,10 @@ cpp-mini-shell/
 - [x] Colored prompt with user, host, cwd
 - [x] Built-in `cd` and `exit`
 - [x] Input redirection (`<`) and append (`>>`)
-- [ ] Piping (`|`) — _in progress_
-- [ ] Background processes (`&`)
-- [ ] Signal handling (`Ctrl+C`, `Ctrl+Z`)
+- [x] Piping (`|`) 
+- [ ] Signal handling (`Ctrl+C`, `Ctrl+Z`)*_IN PROGRESS_*
 - [ ] Command history
+- [ ] Background processes (`&`)
 
 ---
 
