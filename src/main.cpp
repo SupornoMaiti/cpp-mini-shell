@@ -61,7 +61,7 @@ private:
         return tokens;
     }
 
-    vector<vector<string>> split_by_pipe(const vector<string> &tokens)
+    static vector<vector<string>> split_by_pipe(const vector<string> &tokens)
     {
         vector<vector<string>> splitted_tokens;
         vector<string> current_tokens;
@@ -244,7 +244,7 @@ private:
         waitpid(pid, &process_status, 0);
     }
 
-    void execute_pipeline(const vector<vector<string>> &commands)
+    static void execute_pipeline(const vector<vector<string>> &commands)
     {
         size_t n = commands.size();
         if (n == 0) return;
@@ -276,8 +276,7 @@ private:
                 }
                 //Execute this child's command
                 vector<string> cmd = commands[i]; //copying as the function below takes it by reference
-                RedirectionData data;
-                data = redirection(cmd);
+                RedirectionData data = redirection((cmd));
                 if (cmd.empty()) exit(1);
                 //Executing the command
                 vector<char*> c_args = tokens_to_c_pointers(cmd);
@@ -324,7 +323,7 @@ private:
     }
 
 public:
-    void run()
+    static void run()
     {
         string ip;
 
@@ -375,7 +374,7 @@ public:
 
 int main()
 {
-    Shell myShell;
-    myShell.run();
+    //Shell myShell;
+    Shell::run();
     return 0;
 }
