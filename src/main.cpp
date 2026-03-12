@@ -61,9 +61,9 @@ private:
         return tokens;
     }
 
-    vector<vector<string>> split_by_pipe(const vector<string> &tokens)
+    static vector<vector<string>> split_by_pipe(const vector<string> &tokens)
     {
-        vector<vector<string>> splitted_tokens;
+        vector<vector<string>> split_tokens;
         vector<string> current_tokens;
         for (const string &s : tokens)
         {
@@ -74,7 +74,7 @@ private:
                     cout << "Error: Invalid Syntax." << endl;
                     return {};
                 }
-                splitted_tokens.push_back(current_tokens);
+                split_tokens.push_back(current_tokens);
                 current_tokens.clear();
                 continue;
             }
@@ -90,9 +90,9 @@ private:
         }
         else
         {
-            splitted_tokens.push_back(current_tokens);
+            split_tokens.push_back(current_tokens);
         }
-        return splitted_tokens;
+        return split_tokens;
     }
 
     static vector<char *> tokens_to_c_pointers(const vector<string> &tokens)
@@ -205,8 +205,8 @@ private:
             if (!data.output_file.empty())
             {
                 // handled both o/p redirection and append
-                int flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
-                int fd = open(data.output_file.c_str(), flags, 0644);
+                const auto flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
+                const int fd = open(data.output_file.c_str(), flags, 0644);
                 if (fd < 0)
                 {
                     perror("Error: Cannot open redirection file");
@@ -221,7 +221,7 @@ private:
             }
             if (!data.input_file.empty())
             {
-                int fd = open(data.input_file.c_str(), O_RDONLY);
+                const int fd = open(data.input_file.c_str(), O_RDONLY);
                 if (fd < 0)
                 {
                     perror("Error: Cannot open redirection file");
@@ -244,7 +244,7 @@ private:
         waitpid(pid, &process_status, 0);
     }
 
-    void execute_pipeline(const vector<vector<string>> &commands)
+    static void execute_pipeline(const vector<vector<string>> &commands)
     {
         size_t n = commands.size();
         if (n == 0) return;
@@ -276,9 +276,39 @@ private:
                 }
                 //Execute this child's command
                 vector<string> cmd = commands[i]; //copying as the function below takes it by reference
-                RedirectionData data;
-                data = redirection(cmd);
+                //If there is any redirection
+                RedirectionData data = redirection(cmd);
                 if (cmd.empty()) exit(1);
+                if (!data.output_file.empty()) {
+                    // handled both o/p redirection and append
+                    const auto flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
+                    const int fd1 = open(data.output_file.c_str(), flags, 0644);
+                    if (fd1 < 0)
+                    {
+                        perror("Error: Cannot open redirection file");
+                        exit(1);
+                    }
+                    if (dup2(fd1, STDOUT_FILENO) < 0)
+                    {
+                        perror("Error: dup2 failed");
+                        exit(1);
+                    }
+                    close(fd1);
+                }
+                if (!data.input_file.empty()) {
+                    const int fd1 = open(data.input_file.c_str(), O_RDONLY);
+                    if (fd1 < 0)
+                    {
+                        perror("Error: Cannot open redirection file");
+                        exit(1);
+                    }
+                    if (dup2(fd1, STDIN_FILENO) < 0)
+                    {
+                        perror("Error: dup2 failed");
+                        exit(1);
+                    }
+                    close(fd1);
+                }
                 //Executing the command
                 vector<char*> c_args = tokens_to_c_pointers(cmd);
                 execvp(c_args[0],c_args.data());
@@ -324,7 +354,7 @@ private:
     }
 
 public:
-    void run()
+    static void run()
     {
         string ip;
 
@@ -375,7 +405,7 @@ public:
 
 int main()
 {
-    Shell myShell;
-    myShell.run();
+    // Shell myShell;
+    Shell::run();
     return 0;
 }
