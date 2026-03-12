@@ -183,16 +183,49 @@ private:
         return data;
     }
 
-    static void execute_command(vector<string> &tokens)
-    {
+    static void exec_redirection_in_child(vector<string> tokens) {
         RedirectionData data = redirection(tokens);
-        if (tokens.empty())
+        if (tokens.empty()) exit(1);
+        if (!data.output_file.empty())
         {
-            return;
+            // handled both o/p redirection and append
+            const auto flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
+            const int fd = open(data.output_file.c_str(), flags, 0644);
+            if (fd < 0)
+            {
+                perror("Error: Cannot open redirection file");
+                exit(1);
+            }
+            if (dup2(fd, STDOUT_FILENO) < 0)
+            {
+                perror("Error: dup2 failed");
+                exit(1);
+            }
+            close(fd);
+        }
+        if (!data.input_file.empty())
+        {
+            const int fd = open(data.input_file.c_str(), O_RDONLY);
+            if (fd < 0)
+            {
+                perror("Error: Cannot open redirection file");
+                exit(1);
+            }
+            if (dup2(fd, STDIN_FILENO) < 0)
+            {
+                perror("Error: dup2 failed");
+                exit(1);
+            }
+            close(fd);
         }
 
         const vector<char *> c_args = tokens_to_c_pointers(tokens);
-
+        execvp(c_args[0], c_args.data());
+        perror("Error: Command not found");
+        exit(1);
+    }
+    static void execute_command(const vector<string> &tokens)
+    {
         const pid_t pid = fork();
         if (pid < 0)
         {
@@ -202,42 +235,7 @@ private:
 
         if (pid == 0)
         {
-            if (!data.output_file.empty())
-            {
-                // handled both o/p redirection and append
-                const auto flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
-                const int fd = open(data.output_file.c_str(), flags, 0644);
-                if (fd < 0)
-                {
-                    perror("Error: Cannot open redirection file");
-                    exit(1);
-                }
-                if (dup2(fd, STDOUT_FILENO) < 0)
-                {
-                    perror("Error: dup2 failed");
-                    exit(1);
-                }
-                close(fd);
-            }
-            if (!data.input_file.empty())
-            {
-                const int fd = open(data.input_file.c_str(), O_RDONLY);
-                if (fd < 0)
-                {
-                    perror("Error: Cannot open redirection file");
-                    exit(1);
-                }
-                if (dup2(fd, STDIN_FILENO) < 0)
-                {
-                    perror("Error: dup2 failed");
-                    exit(1);
-                }
-                close(fd);
-            }
-
-            execvp(c_args[0], c_args.data());
-            perror("Error: Command not found");
-            exit(1);
+            exec_redirection_in_child(tokens);
         }
 
         int process_status; //Process Status stored for later use.
@@ -248,82 +246,62 @@ private:
     {
         size_t n = commands.size();
         if (n == 0) return;
-        vector<array<int, 2>> fd(n-1);
+        vector<array<int, 2>> pipes(n-1);
         vector<pid_t> pids(n);
         //creating n-1 pipes upfront
         for (size_t i = 0; i < n-1; ++i) {
-            if (pipe(fd[i].data()) < 0) {
+            if (pipe(pipes[i].data()) < 0) {
                 perror("Error: Pipe creation failed.");
+                return;
             }
         }
         //forking n processes
         for (size_t i = 0; i < n; ++i) {
             pids[i] = fork();
+            if (pids[i] < 0) {
+                perror("Error: Fork failed");
+                for (const auto& pipe : pipes) {
+                    close(pipe[0]);
+                    close(pipe[1]);
+                }
+                return;
+            }
             if (pids[i] == 0) {
                 //i th child
                 if (i > 0) {
-                    // If it is not first process.
-                    dup2(fd[i - 1][0],STDIN_FILENO);
+                    // If it is not first process, read from previous pipe.
+                    if(dup2(pipes[i - 1][0],STDIN_FILENO) < 0) {
+                        perror("Error: dup2 failed");
+                        exit(1);
+                    }
                 }
                 if (i < n - 1) {
-                    // If it is not last process
-                    dup2(fd[i][1],STDOUT_FILENO);
+                    // If it is not last process, write to next pipe.
+                    if(dup2(pipes[i][1],STDOUT_FILENO) < 0) {
+                        perror("Error: dup2 failed.");
+                        exit(1);
+                    }
                 }
                 //As child inherits all the pipes from the parent need to close all.
-                for (auto &j: fd) {
+                for (auto &j: pipes) {
                     close(j[0]); //Close all read ends.
                     close(j[1]); //close all write ends.
                 }
-                //Execute this child's command
-                vector<string> cmd = commands[i]; //copying as the function below takes it by reference
-                //If there is any redirection
-                RedirectionData data = redirection((cmd));
-                if (cmd.empty()) exit(1);
-                if (!data.output_file.empty()) {
-                    // handled both o/p redirection and append
-                    const auto flags = O_WRONLY | O_CREAT | (data.append ? O_APPEND : O_TRUNC);
-                    const int fd1 = open(data.output_file.c_str(), flags, 0644);
-                    if (fd1 < 0)
-                    {
-                        perror("Error: Cannot open redirection file");
-                        exit(1);
-                    }
-                    if (dup2(fd1, STDOUT_FILENO) < 0)
-                    {
-                        perror("Error: dup2 failed");
-                        exit(1);
-                    }
-                    close(fd1);
-                }
-                if (!data.input_file.empty()) {
-                    const int fd1 = open(data.input_file.c_str(), O_RDONLY);
-                    if (fd1 < 0)
-                    {
-                        perror("Error: Cannot open redirection file");
-                        exit(1);
-                    }
-                    if (dup2(fd1, STDIN_FILENO) < 0)
-                    {
-                        perror("Error: dup2 failed");
-                        exit(1);
-                    }
-                    close(fd1);
-                }
-                //Executing the command
-                vector<char*> c_args = tokens_to_c_pointers(cmd);
-                execvp(c_args[0],c_args.data());
-                perror("Error: Command not found");
-                exit(1);
+                // Handle any file redirection (overrides pipe fds if specified) and execvp.
+                exec_redirection_in_child(commands[i]);
             }
         }
         //closing all pipes in parent process
-        for (auto & i : fd) {
+        for (auto & i : pipes) {
             close(i[0]);
             close(i[1]);
         }
         //waiting for all child processes;
+        vector<int> process_statuses;//process statuses stored for future use.
         for (auto& i : pids) {
-            waitpid(i,nullptr,0);
+            int process_status;
+            waitpid(i,&process_status,0);
+            process_statuses.push_back(process_status);
         }
     }
 
