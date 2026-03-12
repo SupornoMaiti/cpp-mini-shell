@@ -1,7 +1,6 @@
 #include <array>
 #include <string>
 #include <iostream>
-#include <sstream>
 #include <vector>
 #include <fcntl.h>
 #include <unistd.h>
@@ -183,7 +182,7 @@ private:
         return data;
     }
 
-    static void exec_redirection_in_child(vector<string> tokens) {
+    static void exec_in_child(vector<string> tokens) {
         RedirectionData data = redirection(tokens);
         if (tokens.empty()) exit(1);
         if (!data.output_file.empty())
@@ -235,7 +234,7 @@ private:
 
         if (pid == 0)
         {
-            exec_redirection_in_child(tokens);
+            exec_in_child(tokens);
         }
 
         int process_status; //Process Status stored for later use.
@@ -288,7 +287,7 @@ private:
                     close(j[1]); //close all write ends.
                 }
                 // Handle any file redirection (overrides pipe fds if specified) and execvp.
-                exec_redirection_in_child(commands[i]);
+                exec_in_child(commands[i]);
             }
         }
         //closing all pipes in parent process
