@@ -304,6 +304,19 @@ private:
         }
     }
 
+    static void home_dir(string& cwd) {
+        const char* home_env= getenv("HOME");
+        if (home_env == nullptr) {
+            return ;
+        }
+        const string home = home_env;
+        if (cwd.find(home) == 0) {
+            if (cwd.length() == home.length() || cwd[home.length()] == '/') {
+                cwd = "~" + cwd.substr(home.length());
+            }
+        }
+    }
+
     static string get_prompt()
     {
         // get username.
@@ -326,7 +339,7 @@ private:
         {
             cwd = cwd_buffer;
         }
-
+        home_dir(cwd);
         return "\033[1;32m" + uname + "@" + host_name + "\033[0m:\033[1;34m" + cwd + "\033[0m$ ";
     }
 
