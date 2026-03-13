@@ -117,6 +117,17 @@ private:
             {
                 cout << "Error: cd takes only one argument" << endl;
             }
+            else if (tokens[1] == "~") {
+                const char* home = getenv("HOME");
+                if (home == nullptr) {
+                    cout << "Error: HOME not set." <<"\n";
+                    return true;
+                }
+                string path = home;
+                if (chdir(path.c_str()) != 0) {
+                    perror("Error: cd failed.");
+                }
+            }
             else if (chdir(tokens[1].c_str()) != 0)
             {
                 perror("Error: cd failed");
