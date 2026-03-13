@@ -161,7 +161,7 @@ Shell class
 - [x] Pipe + redirection combined
 - [ ] Signal handling (`Ctrl+C`, `Ctrl+Z`)
 - [ ] Command history (arrow keys)
-- [ ] `~` home directory shorthand in prompt
+- [x] `~` home directory shorthand in prompt
 
 ---
 
