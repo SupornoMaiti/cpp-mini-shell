@@ -13,7 +13,8 @@ A minimal Unix-like shell built from scratch in **C++** to deeply understand Ope
 - ✅ **Output Redirection** — `>` (overwrite) and `>>` (append) stdout to file
 - ✅ **Input Redirection** — `<` read stdin from file
 - ✅ **Quote Handling** — `echo "Hello World"` treated as single token
-- ✅ **Colored Prompt** — displays `user@hostname:cwd$` with ANSI colors
+- ✅ **Signal Handling** — `Ctrl+C` kills child only, `Ctrl+Z` stops child only — shell always survives
+- ✅ **Colored Prompt** — displays `user@hostname:~` with ANSI colors and `~` home shorthand
 - ✅ **Built-in Commands** — `cd` (with error handling), `exit`
 - ✅ **Process Management** — safe child process creation via `fork` + `waitpid`
 
@@ -65,8 +66,12 @@ suporno@arch:~$ ls | grep .cpp > output.txt
 # Quote handling
 suporno@arch:~$ echo "Hello World"
 
-# Change directory
-suporno@arch:~$ cd /home/user
+# Signal handling — shell survives both
+suporno@arch:~$ sleep 10   # Ctrl+C kills sleep, shell continues
+suporno@arch:~$ sleep 10   # Ctrl+Z stops sleep, shell continues
+
+# Home directory shorthand
+suporno@arch:~$ cd ~/Projects
 
 # Exit
 suporno@arch:~$ exit
@@ -90,10 +95,10 @@ single command?   ──►  handle_cd() or execute_command()
 multiple commands?──►  execute_pipeline()
     │
     ▼
-exec_in_child()   ──►  Applies <, >, >> redirections via dup2, then execvp()
+exec_in_child()   ──►  Restores signal defaults, applies redirections, execvp()
     │
     ├── Pipeline:  Creates n-1 pipes, forks n children, wires stdin/stdout
-    └── Parent:    Closes all pipe ends, waitpid() for all children
+    └── Parent:    Closes all pipe ends, waitpid(WUNTRACED) for all children
 ```
 
 ---
@@ -104,7 +109,8 @@ exec_in_child()   ──►  Applies <, >, >> redirections via dup2, then execvp
 | ----------------------- | ----------------------------------------- |
 | Process Creation        | `fork()`                                  |
 | Program Execution       | `execvp()`                                |
-| Process Synchronization | `waitpid()`                               |
+| Process Synchronization | `waitpid()`, `WUNTRACED`                  |
+| Signal Handling         | `sigaction()`, `SIGINT`, `SIGTSTP`        |
 | Output Redirection      | `dup2()`, `open()`, `O_WRONLY`, `O_TRUNC` |
 | Append Redirection      | `O_APPEND`                                |
 | Input Redirection       | `dup2()`, `open()`, `O_RDONLY`            |
@@ -134,16 +140,30 @@ cpp-mini-shell/
 
 ```
 Shell class
-├── tokenize()           — string → vector<string>, handles quotes
-├── split_by_pipe()      — vector<string> → vector<vector<string>>
-├── redirection()        — parses <, >, >> and strips from tokens
+├── tokenize()             — string → vector<string>, handles quotes
+├── split_by_pipe()        — vector<string> → vector<vector<string>>
+├── redirection()          — parses <, >, >> and strips from tokens
 ├── tokens_to_c_pointers() — vector<string> → char*[] for execvp
-├── handle_cd()          — built-in cd command
-├── exec_in_child()      — applies redirections + execvp (reusable core)
-├── execute_command()    — single command: fork + exec_in_child + waitpid
-├── execute_pipeline()   — N commands: N-1 pipes + N forks + exec_in_child
-├── get_prompt()         — builds colored user@host:cwd$ prompt
-└── run()                — main REPL loop
+├── home_dir()             — replaces /home/user prefix with ~
+├── handle_cd()            — built-in cd command
+├── exec_in_child()        — restores signals, applies redirections, execvp
+├── execute_command()      — single command: fork + exec_in_child + waitpid
+├── execute_pipeline()     — N commands: N-1 pipes + N forks + exec_in_child
+├── get_prompt()           — builds colored user@host:~path$ prompt
+└── run()                  — sets up signal handling, main REPL loop
+```
+
+---
+
+## 🔒 Signal Handling Design
+
+```
+Shell (run())         →  SIGINT ignored,  SIGTSTP ignored
+exec_in_child()       →  SIGINT restored, SIGTSTP restored
+
+Result:
+  Ctrl+C  →  kills   only the foreground child, shell survives
+  Ctrl+Z  →  stops   only the foreground child, shell survives
 ```
 
 ---
@@ -155,19 +175,19 @@ Shell class
 - [x] Append redirection (`>>`)
 - [x] Input redirection (`<`)
 - [x] Colored prompt with user, host, cwd
+- [x] `~` home directory shorthand in prompt
 - [x] Built-in `cd` and `exit`
 - [x] Quote handling
 - [x] Piping (`|`) with multiple commands
 - [x] Pipe + redirection combined
-- [ ] Signal handling (`Ctrl+C`, `Ctrl+Z`)
+- [x] Signal handling (`Ctrl+C`, `Ctrl+Z`)
 - [ ] Command history (arrow keys)
-- [x] `~` home directory shorthand in prompt
 
 ---
 
 ## 🧠 Why I Built This
 
-Most developers use a shell every day without knowing what happens under the hood. Building one from scratch forced me to understand exactly how processes are created, how file descriptors work, how pipes connect processes, and how the OS manages execution — concepts that map directly to GATE OS topics and systems programming interviews.
+Most developers use a shell every day without knowing what happens under the hood. Building one from scratch forced me to understand exactly how processes are created, how file descriptors work, how pipes connect processes, how signals are delivered, and how the OS manages execution — concepts that map directly to GATE OS topics and systems programming interviews.
 
 ---
 
