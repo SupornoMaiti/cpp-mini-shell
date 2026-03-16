@@ -194,6 +194,15 @@ private:
     }
 
     static void exec_in_child(vector<string> tokens) {
+        //Signal Handling
+        struct sigaction not_ignore{};
+        not_ignore.sa_handler = SIG_DFL;
+        sigemptyset(&not_ignore.sa_mask);
+        not_ignore.sa_flags = 0;
+
+        sigaction(SIGINT,&not_ignore,nullptr);
+        sigaction(SIGTSTP,&not_ignore,nullptr);
+        //---------------
         RedirectionData data = redirection(tokens);
         if (tokens.empty()) exit(1);
         if (!data.output_file.empty())
@@ -234,6 +243,7 @@ private:
         perror("Error: Command not found");
         exit(1);
     }
+
     static void execute_command(const vector<string> &tokens)
     {
         const pid_t pid = fork();
@@ -249,7 +259,10 @@ private:
         }
 
         int process_status; //Process Status stored for later use.
-        waitpid(pid, &process_status, 0);
+        waitpid(pid, &process_status, WUNTRACED);
+        if (WIFSTOPPED(process_status)) {
+            write(STDERR_FILENO,"\n",1);
+        }
     }
 
     static void execute_pipeline(const vector<vector<string>> &commands)
@@ -310,8 +323,11 @@ private:
         vector<int> process_statuses;//process statuses stored for future use.
         for (auto& i : pids) {
             int process_status;
-            waitpid(i,&process_status,0);
+            waitpid(i,&process_status,WUNTRACED);
             process_statuses.push_back(process_status);
+            if (WIFSTOPPED(process_status)) {
+                write(STDOUT_FILENO, "\n", 1);
+            }
         }
     }
 
@@ -357,6 +373,15 @@ private:
 public:
     static void run()
     {
+        //Signal Handling
+        struct sigaction ign_sgnl{};
+        ign_sgnl.sa_handler = SIG_IGN;
+        sigemptyset(&ign_sgnl.sa_mask);
+        ign_sgnl.sa_flags = 0;
+
+        sigaction(SIGINT,&ign_sgnl,nullptr);
+        sigaction(SIGTSTP,&ign_sgnl,nullptr);
+        //---------------
         string ip;
 
         while (true)
