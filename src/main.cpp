@@ -5,6 +5,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 using namespace std;
 
@@ -105,6 +107,14 @@ private:
         return c_pointers;
     }
 
+    static string expand_tilde(const string& path) {
+        if (path.empty() ||  path[0] != '~') return path;
+
+        const char* home = getenv("HOME");
+        if (home == nullptr) return  path;
+        return string(home) + path.substr(1);
+    }
+
     static bool handle_cd(const vector<string> &tokens)
     {
         if (!tokens.empty() && tokens[0] == "cd")
@@ -117,20 +127,11 @@ private:
             {
                 cout << "Error: cd takes only one argument" << endl;
             }
-            else if (tokens[1] == "~") {
-                const char* home = getenv("HOME");
-                if (home == nullptr) {
-                    cout << "Error: HOME not set." <<"\n";
-                    return true;
-                }
-                string path = home;
+            else{
+                string path = expand_tilde(tokens[1]);
                 if (chdir(path.c_str()) != 0) {
-                    perror("Error: cd failed.");
+                    perror("Error: cd failed");
                 }
-            }
-            else if (chdir(tokens[1].c_str()) != 0)
-            {
-                perror("Error: cd failed");
             }
             return true;
         }
@@ -382,21 +383,28 @@ public:
         sigaction(SIGINT,&ign_sgnl,nullptr);
         sigaction(SIGTSTP,&ign_sgnl,nullptr);
         //---------------
-        string ip;
-
+        //History
+        const string history_file_path = []() {
+            const char* home = getenv("HOME");
+            return home ? string(home) + "/.myshell_history" : ".myshell_history";
+        }();
+        using_history(); // Initialized History
+        read_history(history_file_path.c_str()); // Loaded history from the disk to ram
+        stifle_history(1000); //Limited history to 1000 lines.
         while (true)
         {
-            cout << get_prompt() << flush;
-            if (!getline(cin, ip))
-            {
+            char* raw_input = readline(get_prompt().c_str());
+            if (raw_input == nullptr) {
+                cout << "\n";
                 break;
             }
-
-            if (ip.empty())
-            {
-                continue;
+            string ip(raw_input);
+            free(raw_input);
+            if (ip.empty()) continue;
+            HIST_ENTRY* last = history_get(history_length);
+            if (last == nullptr || ip != last->line) {
+                add_history(ip.c_str());
             }
-
             vector<string> tokens = tokenize(ip);
             if (tokens.empty())
             {
@@ -426,6 +434,7 @@ public:
                 execute_pipeline(commands);
             }
         }
+        write_history(history_file_path.c_str());
     }
 };
 
